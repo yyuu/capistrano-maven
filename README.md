@@ -18,7 +18,32 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+This recipes will try to do following things during Capistrano `deploy:setup` and `deploy` tasks.
+
+(1) Download and install Maven for current project
+(2) Prepare Maven's settings.xml for current project (optional)
+(3) Build Maven project remotely (default) or locally
+
+To build you Maven projects during Capistrano `deploy` tasks, add following in you `config/deploy.rb`. By default, Maven build will run after the Capistrano's `deploy:finalize_update`.
+
+    # in "config/deploy.rb"
+    require 'capistrano-maven'
+    set(:mvn_version, '3.0.4') # Maven version to build project
+
+Following options are available to manage your Maven build.
+
+ * `:mvn_version` - project Maven version
+ * `:mvn_archive_url` - download URL for specified Maven version
+ * `:mvn_compile_locally` - compile project on localhost. false by default.
+ * `:mvn_goals` - Maven goals to execute. default is "clean package".
+ * `:mvn_profiles` - Maven profiles to use.
+ * `:mvn_skip_tests` - add `-Dmaven.test.skip=true` in Maven commands. false by default.
+ * `:mvn_update_snapshots` - add `--update-snapshots` if Maven commands. false by default.
+ * `:mvn_update_settings` - update `settings.xml` or not. false by default.
+ * `:mvn_update_settings_locally` - udate `settings.xml` or not on local compilation. false by default.
+ * `:mvn_template_path` - specify ERB template path for settings.xml.
+ * `:mvn_java_home` - optional `JAVA_HOME` settings for Maven commands.
+ * `:mvn_java_home_local` - optional `JAVA_HOME` settings for Maven commands in localhost.
 
 ## Contributing
 
