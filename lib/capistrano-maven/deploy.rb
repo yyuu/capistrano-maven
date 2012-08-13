@@ -224,15 +224,25 @@ module Capistrano
             abort("execution failure") unless system(cmd)
           }
 
+          _cset(:mvn_tar, 'tar')
+          _cset(:mvn_tar_local, 'tar')
+          _cset(:mvn_target_archive) {
+            "#{mvn_target_path}.tar.gz"
+          }
+          _cset(:mvn_target_archive_local) {
+            "#{mvn_target_path_local}.tar.gz"
+          }
           task(:upload_locally, :roles => :app, :except => { :no_release => true }) {
             on_rollback {
-              run("rm -rf #{mvn_target_path}")
+              run("rm -rf #{mvn_target_path} #{mvn_target_archive}")
             }
-            run_locally("test -d #{mvn_target_path_local}")
-            run("mkdir -p #{mvn_target_path}")
-            find_servers_for_task(current_task).each { |server|
-              run_locally("rsync -lrt --chmod=u+rwX,go+rX #{mvn_target_path_local}/ #{user}@#{server.host}:#{mvn_target_path}/")
-            }
+            begin
+              run_locally("cd #{File.dirname(mvn_target_path_local)} && #{mvn_tar_local} chzf #{mvn_target_archive_local} #{File.basename(mvn_target_path_local)}")
+              upload(mvn_target_archive_local, mvn_target_archive)
+              run("cd #{File.dirname(mvn_target_path)} && #{mvn_tar} xzf #{mvn_target_archive} && rm -f #{mvn_target_archive}")
+            ensure
+              run_locally("rm -f #{mvn_target_archive_local}")
+            end
           }
         }
       }
