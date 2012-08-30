@@ -20,9 +20,9 @@ Or install it yourself as:
 
 This recipes will try to do following things during Capistrano `deploy:setup` and `deploy` tasks.
 
-(1) Download and install Maven for current project
-(2) Prepare Maven's settings.xml for current project (optional)
-(3) Build Maven project remotely (default) or locally
+1. Download and install Maven for current project
+2. Prepare Maven's settings.xml for current project (optional)
+3. Build Maven project remotely (default) or locally
 
 To build you Maven projects during Capistrano `deploy` tasks, add following in you `config/deploy.rb`. By default, Maven build will run after the Capistrano's `deploy:finalize_update`.
 
