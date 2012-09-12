@@ -8,14 +8,11 @@ module Capistrano
       configuration.load {
         namespace(:mvn) {
           _cset(:mvn_version, '3.0.4')
+          _cset(:mvn_major_version) {
+            mvn_version.split('.').first.to_i
+          }
           _cset(:mvn_archive_url) {
-            [
-              "http://www.apache.org/dist//maven/binaries/apache-maven-#{mvn_version}-bin.tar.gz",
-              "http://ftp.kddilabs.jp/infosystems/apache//maven/binaries/apache-maven-#{mvn_version}-bin.tar.gz",
-              "http://ftp.riken.jp/net/apache//maven/binaries/apache-maven-#{mvn_version}-bin.tar.gz",
-              "http://ftp.jaist.ac.jp/pub/apache//maven/binaries/apache-maven-#{mvn_version}-bin.tar.gz",
-              "http://ftp.meisei-u.ac.jp/mirror/apache/dist//maven/binaries/apache-maven-#{mvn_version}-bin.tar.gz",
-            ].shuffle().first()
+            "http://www.apache.org/dist/maven/maven-#{mvn_major_version}/#{mvn_version}/binaries/apache-maven-#{mvn_version}-bin.tar.gz"
           }
           _cset(:mvn_archive_file) {
             File.join(shared_path, 'tools', 'mvn', File.basename(URI.parse(mvn_archive_url).path))
