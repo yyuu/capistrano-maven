@@ -4,6 +4,14 @@ require 'uri'
 
 module Capistrano
   module Maven
+    def mvn_validate_archive(archive_file, checksum_file)
+      if cmd = fetch(:mvn_checksum_cmd, nil)
+        "test `#{cmd} #{archive_file} | cut -d' ' -f1` = `cat #{checksum_file}`"
+      else
+        "true"
+      end
+    end
+
     def self.extended(configuration)
       configuration.load {
         namespace(:mvn) {
@@ -19,6 +27,21 @@ module Capistrano
           }
           _cset(:mvn_archive_file_local) {
             File.join(File.expand_path('.'), 'tools', 'mvn', File.basename(URI.parse(mvn_archive_url).path))
+          }
+          _cset(:mvn_checksum_url) {
+            "#{mvn_archive_url}.md5"
+          }
+          _cset(:mvn_checksum_file) {
+            File.join(shared_path, 'tools', 'mvn', File.basename(URI.parse(mvn_checksum_url).path))
+          }
+          _cset(:mvn_checksum_file_local) {
+            File.join(File.expand_path('.'), 'tools', 'mvn', File.basename(URI.parse(mvn_checksum_url).path))
+          }
+          _cset(:mvn_checksum_cmd) {
+            case File.extname(File.basename(URI.parse(mvn_checksum_url).path))
+            when '.md5'  then 'md5sum'
+            when '.sha1' then 'sha1sum'
+            end
           }
           _cset(:mvn_path) {
             File.join(shared_path, 'tools', 'mvn', File.basename(URI.parse(mvn_archive_url).path, "-bin.tar.gz"))
@@ -109,29 +132,47 @@ module Capistrano
           }
 
           task(:install, :roles => :app, :except => { :no_release => true }) {
-            dirs = [ File.dirname(mvn_archive_file), File.dirname(mvn_path) ].uniq()
-            run(<<-E)
+            dirs = [ File.dirname(mvn_checksum_file), File.dirname(mvn_archive_file), File.dirname(mvn_path) ].uniq()
+            execute = []
+            execute << "mkdir -p #{dirs.join(' ')}"
+            execute << (<<-EOS).gsub(/\s+/, ' ')
+              if ! test -f #{mvn_archive_file}; then
+                ( rm -f #{mvn_checksum_file}; wget --no-verbose -O #{mvn_checksum_file} #{mvn_checksum_url} ) &&
+                wget --no-verbose -O #{mvn_archive_file} #{mvn_archive_url} &&
+                #{mvn_validate_archive(mvn_archive_file, mvn_checksum_file)} || ( rm -f #{mvn_archive_file}; false ) &&
+                test -f #{mvn_archive_file};
+              fi
+            EOS
+            execute << (<<-EOS).gsub(/\s+/, ' ')
               if ! test -x #{mvn_bin}; then
-                mkdir -p #{dirs.join(' ')} &&
-                ( test -f #{mvn_archive_file} || wget --no-verbose -O #{mvn_archive_file} #{mvn_archive_url} ) &&
                 ( test -d #{mvn_path} || tar xf #{mvn_archive_file} -C #{File.dirname(mvn_path)} ) &&
                 test -x #{mvn_bin};
-              fi &&
-              #{mvn_cmd} --version;
-            E
+              fi
+            EOS
+            execute << "#{mvn_cmd} --version"
+            run(execute.join(' && '))
           }
 
-          task(:install_locally, :except => { :no_release => true }) { # TODO: make install and install_locally together
-            dirs = [ File.dirname(mvn_archive_file_local), File.dirname(mvn_path_local) ].uniq()
-            run_locally(<<-E)
+          task(:install_locally, :except => { :no_release => true }) {
+            dirs = [ File.dirname(mvn_checksum_file_local), File.dirname(mvn_archive_file_local), File.dirname(mvn_path_local) ].uniq()
+            execute = []
+            execute << "mkdir -p #{dirs.join(' ')}"
+            execute << (<<-EOS).gsub(/\s+/, ' ')
+              if ! test -f #{mvn_archive_file_local}; then
+                ( rm -f #{mvn_checksum_file_local}; wget --no-verbose -O #{mvn_checksum_file_local} #{mvn_checksum_url} ) &&
+                wget --no-verbose -O #{mvn_archive_file_local} #{mvn_archive_url} &&
+                #{mvn_validate_archive(mvn_archive_file_local, mvn_checksum_file_local)} || ( rm -f #{mvn_archive_file_local}; false ) &&
+                test -f #{mvn_archive_file_local};
+              fi
+            EOS
+            execute << (<<-EOS).gsub(/\s+/, ' ')
               if ! test -x #{mvn_bin_local}; then
-                mkdir -p #{dirs.join(' ')} &&
-                ( test -f #{mvn_archive_file_local} || wget --no-verbose -O #{mvn_archive_file_local} #{mvn_archive_url} ) &&
                 ( test -d #{mvn_path_local} || tar xf #{mvn_archive_file_local} -C #{File.dirname(mvn_path_local)} ) &&
                 test -x #{mvn_bin_local};
-              fi &&
-              #{mvn_cmd_local} --version;
-            E
+              fi
+            EOS
+            execute << "#{mvn_cmd_local} --version"
+            run_locally(execute.join(' && '))
           }
 
           task(:update_settings, :roles => :app, :except => { :no_release => true }) {
