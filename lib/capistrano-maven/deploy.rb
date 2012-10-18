@@ -1,17 +1,10 @@
 
 require 'capistrano'
+require 'tempfile'
 require 'uri'
 
 module Capistrano
   module Maven
-    def mvn_validate_archive(archive_file, checksum_file)
-      if cmd = fetch(:mvn_checksum_cmd, nil)
-        "test `#{cmd} #{archive_file} | cut -d' ' -f1` = `cat #{checksum_file}`"
-      else
-        "true"
-      end
-    end
-
     def self.extended(configuration)
       configuration.load {
         namespace(:mvn) {
@@ -131,96 +124,103 @@ module Capistrano
             }
           }
 
-          task(:install, :roles => :app, :except => { :no_release => true }) {
-            dirs = [ File.dirname(mvn_checksum_file), File.dirname(mvn_archive_file), File.dirname(mvn_path) ].uniq()
+          def _validate_archive(archive_file, checksum_file)
+            if cmd = fetch(:mvn_checksum_cmd, nil)
+              "test `#{cmd} #{archive_file} | cut -d' ' -f1` = `cat #{checksum_file}`"
+            else
+              "true"
+            end
+          end
+
+          def _install(options={})
+            path = options.delete(:path)
+            bin = options.delete(:bin)
+            checksum_file = options.delete(:checksum_file)
+            checksum_url = options.delete(:checksum_url)
+            archive_file = options.delete(:archive_file)
+            archive_url = options.delete(:archive_url)
+            dirs = [ File.dirname(checksum_file), File.dirname(archive_file), File.dirname(path) ].uniq()
             execute = []
             execute << "mkdir -p #{dirs.join(' ')}"
-            execute << (<<-EOS).gsub(/\s+/, ' ')
-              if ! test -f #{mvn_archive_file}; then
-                ( rm -f #{mvn_checksum_file}; wget --no-verbose -O #{mvn_checksum_file} #{mvn_checksum_url} ) &&
-                wget --no-verbose -O #{mvn_archive_file} #{mvn_archive_url} &&
-                #{mvn_validate_archive(mvn_archive_file, mvn_checksum_file)} || ( rm -f #{mvn_archive_file}; false ) &&
-                test -f #{mvn_archive_file};
+            execute << (<<-EOS).gsub(/\s+/, ' ').strip
+              if ! test -f #{archive_file}; then
+                ( rm -f #{checksum_file}; wget --no-verbose -O #{checksum_file} #{checksum_url} ) &&
+                wget --no-verbose -O #{archive_file} #{archive_url} &&
+                #{_validate_archive(archive_file, checksum_file)} || ( rm -f #{archive_file}; false ) &&
+                test -f #{archive_file};
               fi
             EOS
-            execute << (<<-EOS).gsub(/\s+/, ' ')
-              if ! test -x #{mvn_bin}; then
-                ( test -d #{mvn_path} || tar xf #{mvn_archive_file} -C #{File.dirname(mvn_path)} ) &&
-                test -x #{mvn_bin};
+            execute << (<<-EOS).gsub(/\s+/, ' ').strip
+              if ! test -x #{bin}; then
+                ( test -d #{path} || tar xf #{archive_file} -C #{File.dirname(path)} ) &&
+                test -x #{bin};
               fi
             EOS
-            execute << "#{mvn_cmd} --version"
-            run(execute.join(' && '))
+            execute.join(' && ')
+          end
+
+          task(:install, :roles => :app, :except => { :no_release => true }) {
+            run(_install(:path => mvn_path, :bin => mvn_bin,
+                         :checksum_file => mvn_checksum_file, :checksum_url => mvn_checksum_url,
+                         :archive_file => mvn_archive_file, :archive_url => mvn_archive_url))
+            run("#{mvn_cmd} --version")
           }
 
           task(:install_locally, :except => { :no_release => true }) {
-            dirs = [ File.dirname(mvn_checksum_file_local), File.dirname(mvn_archive_file_local), File.dirname(mvn_path_local) ].uniq()
-            execute = []
-            execute << "mkdir -p #{dirs.join(' ')}"
-            execute << (<<-EOS).gsub(/\s+/, ' ')
-              if ! test -f #{mvn_archive_file_local}; then
-                ( rm -f #{mvn_checksum_file_local}; wget --no-verbose -O #{mvn_checksum_file_local} #{mvn_checksum_url} ) &&
-                wget --no-verbose -O #{mvn_archive_file_local} #{mvn_archive_url} &&
-                #{mvn_validate_archive(mvn_archive_file_local, mvn_checksum_file_local)} || ( rm -f #{mvn_archive_file_local}; false ) &&
-                test -f #{mvn_archive_file_local};
-              fi
-            EOS
-            execute << (<<-EOS).gsub(/\s+/, ' ')
-              if ! test -x #{mvn_bin_local}; then
-                ( test -d #{mvn_path_local} || tar xf #{mvn_archive_file_local} -C #{File.dirname(mvn_path_local)} ) &&
-                test -x #{mvn_bin_local};
-              fi
-            EOS
-            execute << "#{mvn_cmd_local} --version"
-            run_locally(execute.join(' && '))
+            run_locally(_install(:path => mvn_path_local, :bin => mvn_bin_local,
+                                 :checksum_file => mvn_checksum_file_local, :checksum_url => mvn_checksum_url,
+                                 :archive_file => mvn_archive_file_local, :archive_url => mvn_archive_url))
+            run_locally("#{mvn_cmd_local} --version")
           }
 
+          def template(file)
+            if File.file?(file)
+              File.read(file)
+            elsif File.file?("#{file}.erb")
+              ERB.new(File.read(file)).result(binding)
+            else
+              abort("No such template: #{file} or #{file}.erb")
+            end
+          end
+
+          def _update_settings(files_map, options={})
+            execute = []
+            dirs = files_map.map { |src, dst| File.dirname(dst) }.uniq
+            execute << "mkdir -p #{dirs.join(' ')}" unless dirs.empty?
+            files_map.each do |src, dst|
+              execute << "( diff -u #{dst} #{src} || mv -f #{src} #{dst} )"
+              cleanup = options.fetch(:cleanup, [])
+              execute << "rm -f #{cleanup.join(' ')}" unless cleanup.empty?
+            end
+            execute.join(' && ')
+          end
+
           task(:update_settings, :roles => :app, :except => { :no_release => true }) {
-            tmp_files = []
-            on_rollback {
-              run("rm -f #{tmp_files.join(' ')}") unless tmp_files.empty?
-            }
-            mvn_settings.each { |file|
-              tmp_files << tmp_file = File.join('/tmp', File.basename(file))
-              src_file = File.join(mvn_template_path, file)
-              dst_file = File.join(mvn_project_path, file)
-              run(<<-E)
-                ( test -d #{File.dirname(dst_file)} || mkdir -p #{File.dirname(dst_file)} ) &&
-                ( test -f #{dst_file} && mv -f #{dst_file} #{dst_file}.orig; true );
-              E
-              if File.file?(src_file)
-                put(File.read(src_file), tmp_file)
-              elsif File.file?("#{src_file}.erb")
-                put(ERB.new(File.read("#{src_file}.erb")).result(binding), tmp_file)
-              else
-                abort("mvn:update_settings: no such template found: #{src_file} or #{src_file}.erb")
+            srcs = mvn_settings.map { |f| File.join(mvn_template_path, f) }
+            tmps = mvn_settings.map { |f| t=Tempfile.new('mvn');s=t.path;t.close(true);s }
+            dsts = mvn_settings.map { |f| File.join(mvn_settings_path, f) }
+            begin
+              srcs.zip(tmps).each do |src, tmp|
+                put(template(src), tmp)
               end
-              run("diff #{dst_file} #{tmp_file} || mv -f #{tmp_file} #{dst_file}")
-            }
-            run("rm -f #{mvn_cleanup_settings.join(' ')}") unless mvn_cleanup_settings.empty?
+              run(_update_settings(tmps.zip(dsts), :cleanup => mvn_cleanup_settings)) unless tmps.empty?
+            ensure
+              run("rm -f #{tmps.join(' ')}") unless tmps.empty?
+            end
           }
 
           task(:update_settings_locally, :except => { :no_release => true }) {
-            mvn_settings_local.each { |file|
-              src_file = File.join(mvn_template_path, file)
-              dst_file = File.join(mvn_project_path_local, file)
-              run_locally(<<-E)
-                ( test -d #{File.dirname(dst_file)} || mkdir -p #{File.dirname(dst_file)} ) &&
-                ( test -f #{dst_file} && mv -f #{dst_file} #{dst_file}.orig; true );
-              E
-              if File.file?(src_file)
-                File.open(dst_file, 'w') { |fp|
-                  fp.write(File.read(src_file))
-                }
-              elsif File.file?("#{src_file}.erb")
-                File.open(dst_file, 'w') { |fp|
-                  fp.write(ERB.new(File.read("#{src_file}.erb")).result(binding))
-                }
-              else
-                abort("mvn:update_settings_locally: no such template: #{src_file} or #{src_file}.erb")
+            srcs = mvn_settings_local.map { |f| File.join(mvn_template_path, f) }
+            tmps = mvn_settings.map { |f| t=Tempfile.new('mvn');s=t.path;t.close(true);s }
+            dsts = mvn_settings_local.map { |f| File.join(mvn_settings_path_local, f) }
+            begin
+              srcs.zip(tmps).each do |src, tmp|
+                File.open(tmp, 'wb') { |fp| fp.write(template(src)) }
               end
-            }
-            run_locally("rm -f #{mvn_cleanup_settings_local.join(' ')}") unless mvn_cleanup_settings_local.empty?
+              run_locally(_update_settings(tmps.zip(dsts), :cleanup => mvn_cleanup_settings_local)) unless tmps.empty?
+            ensure
+              run_locally("rm -f #{tmps.join(' ')}") unless tmps.empty?
+            end
           }
 
           desc("Update maven build.")
@@ -253,7 +253,6 @@ module Capistrano
 
           desc("Perform maven build locally.")
           task(:execute_locally, :roles => :app, :except => { :no_release => true }) {
-            setup_locally
             on_rollback {
               run_locally("cd #{mvn_project_path_local} && #{mvn_cmd_local} clean")
             }
