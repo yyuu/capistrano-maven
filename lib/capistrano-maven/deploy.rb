@@ -177,7 +177,7 @@ module Capistrano
             if File.file?(file)
               File.read(file)
             elsif File.file?("#{file}.erb")
-              ERB.new(File.read(file)).result(binding)
+              ERB.new(File.read("#{file}.erb")).result(binding)
             else
               abort("No such template: #{file} or #{file}.erb")
             end
