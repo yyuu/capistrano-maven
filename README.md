@@ -41,6 +41,10 @@ Following options are available to manage your Maven build.
  * `:mvn_update_snapshots` - add `--update-snapshots` if Maven commands. false by default.
  * `:mvn_update_settings` - update `settings.xml` or not. false by default.
  * `:mvn_update_settings_locally` - udate `settings.xml` or not on local compilation. false by default.
+ * `:mvn_settings` - list of your optional setting files for Maven. use `%w(settings.xml)` by default.
+ * `:mvn_settings_local` - list of your optional setting files for Maven. use `%w(settings.xml)` by default.
+ * `:mvn_settings_path` - the destination path of the optional `settings.xml` file. use `:release_path` by default.
+ * `:mvn_settings_path_local` - the destination path of the optional `settings.xml` file. use `pwd` by default.
  * `:mvn_template_path` - specify ERB template path for settings.xml.
  * `:mvn_java_home` - optional `JAVA_HOME` settings for Maven commands.
  * `:mvn_java_home_local` - optional `JAVA_HOME` settings for Maven commands in localhost.

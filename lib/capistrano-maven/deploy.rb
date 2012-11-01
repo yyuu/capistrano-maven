@@ -49,19 +49,17 @@ module Capistrano
             File.join(mvn_path_local, 'bin', 'mvn')
           }
           _cset(:mvn_cmd) {
-            settings = "--settings=#{mvn_settings_path}/settings.xml" if mvn_update_settings
             if fetch(:mvn_java_home, nil)
-              "env JAVA_HOME=#{mvn_java_home} #{mvn_bin} #{mvn_options.join(' ')} #{settings}"
+              "env JAVA_HOME=#{mvn_java_home} #{mvn_bin} #{mvn_options.join(' ')}"
             else
-              "#{mvn_bin} #{mvn_options.join(' ')} #{settings}"
+              "#{mvn_bin} #{mvn_options.join(' ')}"
             end
           }
           _cset(:mvn_cmd_local) {
-            settings = "--settings=#{mvn_settings_path_local}/settings.xml" if mvn_update_settings_locally
             if fetch(:mvn_java_home_local, nil)
-              "env JAVA_HOME=#{mvn_java_home_local} #{mvn_bin_local} #{mvn_options_local.join(' ')} #{settings}"
+              "env JAVA_HOME=#{mvn_java_home_local} #{mvn_bin_local} #{mvn_options_local.join(' ')}"
             else
-              "#{mvn_bin_local} #{mvn_options_local.join(' ')} #{settings}"
+              "#{mvn_bin_local} #{mvn_options_local.join(' ')}"
             end
           }
           _cset(:mvn_project_path) {
@@ -79,12 +77,8 @@ module Capistrano
           _cset(:mvn_template_path, File.join(File.dirname(__FILE__), 'templates'))
           _cset(:mvn_update_settings, false)
           _cset(:mvn_update_settings_locally, false)
-          _cset(:mvn_settings_path) {
-            mvn_project_path
-          }
-          _cset(:mvn_settings_path_local) {
-            mvn_project_path_local
-          }
+          _cset(:mvn_settings_path) { mvn_project_path }
+          _cset(:mvn_settings_path_local) { mvn_project_path_local }
           _cset(:mvn_settings, %w(settings.xml))
           _cset(:mvn_settings_local, %w(settings.xml))
           _cset(:mvn_cleanup_settings, [])
@@ -100,10 +94,20 @@ module Capistrano
             options
           }
           _cset(:mvn_options) {
-            mvn_common_options + fetch(:mvn_extra_options, [])
+            options = mvn_common_options + fetch(:mvn_extra_options, [])
+            if mvn_update_settings
+              settings = File.join(mvn_settings_path, mvn_settings.first)
+              options << "--settings=#{settings}"
+            end
+            options
           }
           _cset(:mvn_options_local) {
-            mvn_common_options + fetch(:mvn_extra_options_local, [])
+            options = mvn_common_options + fetch(:mvn_extra_options_local, [])
+            if mvn_update_settings_locally
+              settings = File.join(mvn_settings_path_local, mvn_settings_local.first)
+              options << "--settings=#{settings}"
+            end
+            options
           }
 
           desc("Setup maven.")
