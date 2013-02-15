@@ -48,6 +48,7 @@ Following options are available to manage your Maven build.
  * `:mvn_template_path` - specify ERB template path for settings.xml.
  * `:mvn_java_home` - optional `JAVA_HOME` settings for Maven commands.
  * `:mvn_java_home_local` - optional `JAVA_HOME` settings for Maven commands in localhost.
+ * `:mvn_release_build` - Skip building on SNAPSHOT version. `false` by default.
 
 ## Contributing
 
