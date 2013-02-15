@@ -246,22 +246,26 @@ module Capistrano
             }
           }
 
+          def _mvn(cmd, path, goals=[])
+            "cd #{path.dump} && #{cmd} #{goals.map { |s| s.dump }.join(' ')}"
+          end
+
           desc("Perform maven build.")
           task(:execute, :roles => :app, :except => { :no_release => true }) {
             on_rollback {
-              run("cd #{mvn_project_path} && #{mvn_cmd} clean")
+              run(_mvn(mvn_cmd, mvn_project_path, %w(clean)))
             }
-            run("cd #{mvn_project_path} && #{mvn_cmd} #{mvn_goals.join(' ')}")
+            run(_mvn(mvn_cmd, mvn_project_path, mvn_goals))
           }
 
           desc("Perform maven build locally.")
           task(:execute_locally, :roles => :app, :except => { :no_release => true }) {
             on_rollback {
-              run_locally("cd #{mvn_project_path_local} && #{mvn_cmd_local} clean")
+              run_locally(_mvn(mvn_cmd_local, mvn_project_path_local, %w(clean)))
             }
-            cmd = "cd #{mvn_project_path_local} && #{mvn_cmd_local} #{mvn_goals.join(' ')}"
-            logger.info(cmd)
-            abort("execution failure") unless system(cmd)
+            cmdline = _mvn(mvn_cmd_local, mvn_project_path_local, mvn_goals)
+            logger.info(cmdline)
+            abort("execution failure") unless system(cmdline)
           }
 
           _cset(:mvn_tar, 'tar')
