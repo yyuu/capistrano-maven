@@ -200,7 +200,7 @@ module Capistrano
 
           task(:update_settings, :roles => :app, :except => { :no_release => true }) {
             srcs = mvn_settings.map { |f| File.join(mvn_template_path, f) }
-            tmps = mvn_settings.map { |f| capture("mktemp").chomp }
+            tmps = mvn_settings.map { |f| capture("t=$(mktemp /tmp/capistrano-maven.XXXXXXXXXX);rm -f $t;echo $t").chomp }
             dsts = mvn_settings.map { |f| File.join(mvn_settings_path, f) }
             begin
               srcs.zip(tmps).each do |src, tmp|
@@ -214,7 +214,7 @@ module Capistrano
 
           task(:update_settings_locally, :except => { :no_release => true }) {
             srcs = mvn_settings_local.map { |f| File.join(mvn_template_path, f) }
-            tmps = mvn_settings.map { |f| `mktemp`.chomp }
+            tmps = mvn_settings.map { |f| `t=$(mktemp /tmp/capistrano-maven.XXXXXXXXXX);rm -f $t;echo $t`.chomp }
             dsts = mvn_settings_local.map { |f| File.join(mvn_settings_path_local, f) }
             begin
               srcs.zip(tmps).each do |src, tmp|
