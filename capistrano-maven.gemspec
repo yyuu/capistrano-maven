@@ -16,5 +16,6 @@ Gem::Specification.new do |gem|
   gem.version       = Capistrano::Maven::VERSION
 
   gem.add_dependency("capistrano")
+  gem.add_dependency("capistrano-file-resources", "~> 0.0.1")
   gem.add_dependency("capistrano-file-transfer-ext", "~> 0.0.1")
 end

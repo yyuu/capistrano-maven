@@ -1,6 +1,7 @@
 require "capistrano-maven/version"
 require "capistrano"
 require "capistrano/configuration/actions/file_transfer_ext"
+require "capistrano/configuration/resources/file_resources"
 require "uri"
 
 module Capistrano
@@ -177,30 +178,16 @@ module Capistrano
             run_locally("#{mvn_cmd_local} --version")
           }
 
-          def template(file)
-            if File.file?(file)
-              File.read(file)
-            elsif File.file?("#{file}.erb")
-              ERB.new(File.read("#{file}.erb")).result(binding)
-            else
-              abort("No such template: #{file} or #{file}.erb")
-            end
-          end
-
           task(:update_settings, :roles => :app, :except => { :no_release => true }) {
             mvn_settings.each do |f|
-              src = File.join(mvn_template_path, f)
-              dst = File.join(mvn_settings_path, f)
-              safe_put(template(src), dst, :compare_method => :diff)
+              safe_put(template(f, :path => mvn_template_path), File.join(mvn_settings_path, f))
             end
             run("rm -f #{mvn_cleanup_settings.map { |x| x.dump }.join(' ')}") unless mvn_cleanup_settings.empty?
           }
 
           task(:update_settings_locally, :except => { :no_release => true }) {
             mvn_settings_local.each do |f|
-              src = File.join(mvn_template_path, f)
-              dst = File.join(mvn_settings_path_local, f)
-              File.write(dst, template(src))
+              File.write(File.join(mvn_settings_path_local, f), template(f, :path => mvn_template_path))
             end
             run_locally("rm -f #{mvn_cleanup_settings_local.map { |x| x.dump }.join(' ')}") unless mvn_cleanup_settings_local.empty?
           }
