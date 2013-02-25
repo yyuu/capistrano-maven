@@ -1,5 +1,7 @@
 require "capistrano-maven/version"
 require "capistrano"
+require "capistrano/configuration/actions/file_transfer_ext"
+require "capistrano/configuration/resources/file_resources"
 require "uri"
 
 module Capistrano
@@ -176,54 +178,18 @@ module Capistrano
             run_locally("#{mvn_cmd_local} --version")
           }
 
-          def template(file)
-            if File.file?(file)
-              File.read(file)
-            elsif File.file?("#{file}.erb")
-              ERB.new(File.read("#{file}.erb")).result(binding)
-            else
-              abort("No such template: #{file} or #{file}.erb")
-            end
-          end
-
-          def _update_settings(files_map, options={})
-            execute = []
-            dirs = files_map.map { |src, dst| File.dirname(dst) }.uniq
-            execute << "mkdir -p #{dirs.join(' ')}" unless dirs.empty?
-            files_map.each do |src, dst|
-              execute << "( diff -u #{dst} #{src} || mv -f #{src} #{dst} )"
-              cleanup = options.fetch(:cleanup, [])
-              execute << "rm -f #{cleanup.join(' ')}" unless cleanup.empty?
-            end
-            execute.join(' && ')
-          end
-
           task(:update_settings, :roles => :app, :except => { :no_release => true }) {
-            srcs = mvn_settings.map { |f| File.join(mvn_template_path, f) }
-            tmps = mvn_settings.map { |f| capture("t=$(mktemp /tmp/capistrano-maven.XXXXXXXXXX);rm -f $t;echo $t").chomp }
-            dsts = mvn_settings.map { |f| File.join(mvn_settings_path, f) }
-            begin
-              srcs.zip(tmps).each do |src, tmp|
-                put(template(src), tmp)
-              end
-              run(_update_settings(tmps.zip(dsts), :cleanup => mvn_cleanup_settings)) unless tmps.empty?
-            ensure
-              run("rm -f #{tmps.join(' ')}") unless tmps.empty?
+            mvn_settings.each do |f|
+              safe_put(template(f, :path => mvn_template_path), File.join(mvn_settings_path, f))
             end
+            run("rm -f #{mvn_cleanup_settings.map { |x| x.dump }.join(' ')}") unless mvn_cleanup_settings.empty?
           }
 
           task(:update_settings_locally, :except => { :no_release => true }) {
-            srcs = mvn_settings_local.map { |f| File.join(mvn_template_path, f) }
-            tmps = mvn_settings.map { |f| `t=$(mktemp /tmp/capistrano-maven.XXXXXXXXXX);rm -f $t;echo $t`.chomp }
-            dsts = mvn_settings_local.map { |f| File.join(mvn_settings_path_local, f) }
-            begin
-              srcs.zip(tmps).each do |src, tmp|
-                File.open(tmp, 'wb') { |fp| fp.write(template(src)) }
-              end
-              run_locally(_update_settings(tmps.zip(dsts), :cleanup => mvn_cleanup_settings_local)) unless tmps.empty?
-            ensure
-              run_locally("rm -f #{tmps.join(' ')}") unless tmps.empty?
+            mvn_settings_local.each do |f|
+              File.write(File.join(mvn_settings_path_local, f), template(f, :path => mvn_template_path))
             end
+            run_locally("rm -f #{mvn_cleanup_settings_local.map { |x| x.dump }.join(' ')}") unless mvn_cleanup_settings_local.empty?
           }
 
           desc("Update maven build.")
