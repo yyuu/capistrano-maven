@@ -1,0 +1,3 @@
+source "https://rubygems.org"
+gemspec(:path => "../..")
+gem "capistrano-jdk-installer", :github => "yyuu/capistrano-jdk-installer", :branch => "develop"
