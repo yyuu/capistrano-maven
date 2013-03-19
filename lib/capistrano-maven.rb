@@ -9,10 +9,8 @@ module Capistrano
     def self.extended(configuration)
       configuration.load {
         namespace(:mvn) {
-          _cset(:mvn_version, '3.0.4')
-          _cset(:mvn_major_version) {
-            mvn_version.split('.').first.to_i
-          }
+          _cset(:mvn_version, "3.0.5")
+          _cset(:mvn_major_version) { mvn_version.split(".").first.to_i }
           _cset(:mvn_archive_url) {
             "http://www.apache.org/dist/maven/maven-#{mvn_major_version}/#{mvn_version}/binaries/apache-maven-#{mvn_version}-bin.tar.gz"
           }

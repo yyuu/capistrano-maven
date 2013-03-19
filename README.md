@@ -27,8 +27,8 @@ This recipes will try to do following things during Capistrano `deploy:setup` an
 To build you Maven projects during Capistrano `deploy` tasks, add following in you `config/deploy.rb`. By default, Maven build will run after the Capistrano's `deploy:finalize_update`.
 
     # in "config/deploy.rb"
-    require 'capistrano-maven'
-    set(:mvn_version, '3.0.4') # Maven version to build project
+    require "capistrano-maven"
+    set(:mvn_version, "3.0.5") # Maven version to build project
 
 Following options are available to manage your Maven build.
 
