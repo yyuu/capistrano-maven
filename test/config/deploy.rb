@@ -22,7 +22,7 @@ set(:java_setup_remotely, true)
 set(:java_setup_locally, true)
 
 ## mvn ##
-#set(:mvn_path_local, File.expand_path("tmp/mvn"))
+set(:mvn_tools_path_local, File.expand_path("tmp/mvn"))
 
 role :web, "192.168.33.10"
 role :app, "192.168.33.10"
@@ -88,7 +88,12 @@ end
 
 def uninstall_mvn!
   run("rm -rf #{mvn_path.dump}")
+  run("rm -f #{mvn_archive_file.dump}")
   run_locally("rm -rf #{mvn_path_local.dump}")
+  unless mvn_settings.empty?
+    run("rm -f #{mvn_settings.map { |x| File.join(mvn_settings_path, x).dump }.join(" ")}")
+    run_locally("rm -f #{mvn_settings.map { |x| File.join(mvn_settings_path_local, x).dump }.join(" ")}")
+  end
 end
 
 task(:test_all) {
@@ -108,9 +113,12 @@ namespace(:test_default) {
     uninstall_mvn!
     set(:mvn_version, "3.0.5")
     set(:mvn_skip_tests, true)
-    set(:mvn_compile_locally, true)
-#   set(:mvn_update_settings, true)
-#   set(:mvn_update_settings_locally, true)
+    set(:mvn_update_remotely, true)
+    set(:mvn_update_locally, true)
+#   set(:mvn_project_path) { release_path }
+#   set(:mvn_project_path_local) { File.expand_path(".") }
+    set(:mvn_template_path, File.join(File.dirname(__FILE__), "templates"))
+    set(:mvn_settings, %w(settings.xml))
     find_and_execute_task("deploy:setup")
   }
 
@@ -121,11 +129,13 @@ namespace(:test_default) {
 
   task(:test_run_mvn) {
     assert_file_exists(mvn_bin)
+    assert_file_exists(File.join(mvn_settings_path, "settings.xml"))
     assert_command("#{mvn_cmd} --version")
   }
 
   task(:test_run_mvn_via_run_locally) {
     assert_file_exists(mvn_bin_local, :via => :run_locally)
+    assert_file_exists(File.join(mvn_settings_path_local, "settings.xml"), :via => :run_locally)
     assert_command("#{mvn_cmd_local} --version", :via => :run_locally)
   }
 }
