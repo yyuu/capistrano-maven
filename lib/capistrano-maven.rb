@@ -44,28 +44,20 @@ module Capistrano
           _cset(:mvn_goals, %w(clean package))
           _cset(:mvn_common_options) {
             options = []
-            options << "-P#{mvn_profiles.join(',')}" unless fetch(:mvn_profiles, []).empty?
+            options << "-P#{mvn_profiles.join(",")}" unless fetch(:mvn_profiles, []).empty?
             options << "-Dmaven.test.skip=true" if fetch(:mvn_skip_tests, false)
             options << "-U" if fetch(:mvn_update_snapshots, false)
             options << "-B"
             options
           }
-          _cset(:mvn_options) {
-            options = mvn_common_options + fetch(:mvn_extra_options, [])
-            if mvn_update_settings
-              settings = File.join(mvn_settings_path, mvn_settings.first)
-              options << "--settings=#{settings}"
-            end
-            options
+          _cset(:mvn_default_options) {
+            mvn_common_options + mvn_settings.map { |s| "--settings=#{File.join(mvn_settings_path, s).dump}" }
           }
-          _cset(:mvn_options_local) {
-            options = mvn_common_options + fetch(:mvn_extra_options_local, [])
-            if mvn_update_settings_locally
-              settings = File.join(mvn_settings_path_local, mvn_settings_local.first)
-              options << "--settings=#{settings}"
-            end
-            options
+          _cset(:mvn_default_options_local) {
+            mvn_common_options + mvn_settings.map { |s| "--settings=#{File.join(mvn_settings_path_local, s).dump}" }
           }
+          _cset(:mvn_options) { mvn_default_options + fetch(:mvn_extra_options, []) }
+          _cset(:mvn_options_local) { mvn_default_options_local + fetch(:mvn_extra_options_local, []) }
 
           _cset(:mvn_setup_remotely) { mvn_update_remotely }
           _cset(:mvn_setup_locally) { mvn_update_locally }
