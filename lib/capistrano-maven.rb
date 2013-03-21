@@ -22,25 +22,49 @@ module Capistrano
           _cset(:mvn_archive_file_local) { File.join(mvn_archive_path_local, File.basename(URI.parse(mvn_archive_url).path)) }
           _cset(:mvn_path) { File.join(mvn_tools_path, File.basename(URI.parse(mvn_archive_url).path, "-bin.tar.gz")) }
           _cset(:mvn_path_local) { File.join(mvn_tools_path_local, File.basename(URI.parse(mvn_archive_url).path, "-bin.tar.gz")) }
-          _cset(:mvn_bin) { File.join(mvn_path, "bin", "mvn") }
-          _cset(:mvn_bin_local) { File.join(mvn_path_local, "bin", "mvn") }
-          _cset(:mvn_cmd) {
-            if fetch(:mvn_java_home, nil)
-              "env JAVA_HOME=#{mvn_java_home} #{mvn_bin} #{mvn_options.join(' ')}"
-            else
-              "#{mvn_bin} #{mvn_options.join(' ')}"
-            end
-          }
-          _cset(:mvn_cmd_local) {
-            if fetch(:mvn_java_home_local, nil)
-              "env JAVA_HOME=#{mvn_java_home_local} #{mvn_bin_local} #{mvn_options_local.join(' ')}"
-            else
-              "#{mvn_bin_local} #{mvn_options_local.join(' ')}"
-            end
-          }
+          _cset(:mvn_bin_path) { File.join(mvn_path, "bin") }
+          _cset(:mvn_bin_path_local) { File.join(mvn_path_local, "bin") }
+          _cset(:mvn_bin) { File.join(mvn_bin_path, "mvn") }
+          _cset(:mvn_bin_local) { File.join(mvn_bin_path_local, "mvn") }
           _cset(:mvn_project_path) { release_path }
           _cset(:mvn_project_path_local) { File.expand_path(".") }
           _cset(:mvn_template_path) { File.expand_path("config/templates") }
+
+          ## Maven environment
+          _cset(:mvn_common_environment, {})
+          _cset(:mvn_default_environment) {
+            environment = mvn_common_environment.dup
+            environment["JAVA_HOME"] = fetch(:mvn_java_home) if exists?(:mvn_java_home)
+            environment["MAVEN_OPTS"] = fetch(:mvn_java_options) if exists?(:mvn_java_options)
+            environment["PATH"] = [ mvn_bin_path, "$PATH" ].join(":") if mvn_setup_remotely
+            environment
+          }
+          _cset(:mvn_default_environment_local) {
+            environment = mvn_common_environment.dup
+            environment["JAVA_HOME"] = fetch(:mvn_java_home_local) if exists?(:mvn_java_home_local)
+            environment["MAVEN_OPTS"] = fetch(:mvn_java_options_local) if exists?(:mvn_java_options_local)
+            environment["PATH"] = [ mvn_bin_path_local, "$PATH" ].join(":") if mvn_setup_locally
+            environment
+          }
+          _cset(:mvn_environment) { mvn_default_environment.merge(fetch(:mvn_extra_environment, {})) }
+          _cset(:mvn_environment_local) { mvn_default_environment_local.merge(fetch(:mvn_extra_environment_local, {})) }
+          def _command(cmdline, options={})
+            environment = options.fetch(:env, {})
+            if environment.empty?
+              cmdline
+            else
+              env = (["env"] + environment.map { |k, v| "#{k}=#{v.dump}" }).join(" ")
+              "#{env} #{cmdline}"
+            end
+          end
+          def command(cmdline, options={})
+            _command(cmdline, :env => mvn_environment.merge(options.fetch(:env, {})))
+          end
+          def command_local(cmdline, options={})
+            _command(cmdline, :env => mvn_environment_local.merge(options.fetch(:env, {})))
+          end
+          _cset(:mvn_cmd) { command("#{mvn_bin.dump} #{mvn_options.map { |x| x.dump }.join(" ")}") }
+          _cset(:mvn_cmd_local) { command_local("#{mvn_bin_local.dump} #{mvn_options_local.map { |x| x.dump }.join(" ")}") }
           _cset(:mvn_goals, %w(clean package))
           _cset(:mvn_common_options) {
             options = []
