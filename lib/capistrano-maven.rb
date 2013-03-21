@@ -79,10 +79,14 @@ module Capistrano
             options
           }
           _cset(:mvn_default_options) {
-            mvn_common_options + mvn_settings.map { |s| "--settings=#{File.join(mvn_settings_path, s).dump}" }
+            options = mvn_common_options.dup
+            options += mvn_settings.map { |s| "--settings=#{File.join(mvn_settings_path, s).dump}" } if mvn_update_settings
+            options
           }
           _cset(:mvn_default_options_local) {
-            mvn_common_options + mvn_settings.map { |s| "--settings=#{File.join(mvn_settings_path_local, s).dump}" }
+            options = mvn_common_options.dup
+            options += mvn_settings_local.map { |s| "--settings=#{File.join(mvn_settings_path_local, s).dump}" } if mvn_update_settings_locally
+            options
           }
           _cset(:mvn_options) { mvn_default_options + fetch(:mvn_extra_options, []) }
           _cset(:mvn_options_local) { mvn_default_options_local + fetch(:mvn_extra_options_local, []) }
@@ -200,8 +204,8 @@ module Capistrano
             update_settings_locally if mvn_update_settings_locally
           }
 
-          _cset(:mvn_update_settings) { not(mvn_settings.empty?) }
-          _cset(:mvn_update_settings_locally) { not(mvn_settings_local.empty?) }
+          _cset(:mvn_update_settings) { mvn_setup_remotely and not(mvn_settings.empty?) }
+          _cset(:mvn_update_settings_locally) { mvn_setup_locally and not(mvn_settings_local.empty?) }
           _cset(:mvn_settings_path) { mvn_tools_path }
           _cset(:mvn_settings_path_local) { mvn_tools_path_local }
           _cset(:mvn_settings, [])
