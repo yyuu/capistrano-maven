@@ -135,10 +135,26 @@ namespace(:test_default) {
     assert_command("#{mvn_cmd} --version")
   }
 
+  task(:test_run_mvn_via_sudo) {
+    assert_command("#{mvn_cmd} --version")
+  }
+
+  task(:test_run_mvn_without_path) {
+    assert_command("mvn --version")
+  }
+
   task(:test_run_mvn_via_run_locally) {
     assert_file_exists(mvn_bin_local, :via => :run_locally)
     assert_file_exists(File.join(mvn_settings_path_local, "settings.xml"), :via => :run_locally)
     assert_command("#{mvn_cmd_local} --version", :via => :run_locally)
+  }
+
+  task(:test_mvn_exec) {
+    mvn.exec("--version")
+  }
+
+  task(:test_mvn_exec_locally) {
+    mvn.exec_locally("--version")
   }
 
   task(:test_mvn_project) {

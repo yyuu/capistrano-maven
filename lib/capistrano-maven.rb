@@ -35,14 +35,18 @@ module Capistrano
           _cset(:mvn_default_environment) {
             environment = mvn_common_environment.dup
             environment["JAVA_HOME"] = fetch(:mvn_java_home) if exists?(:mvn_java_home)
-            environment["MAVEN_OPTS"] = fetch(:mvn_java_options) if exists?(:mvn_java_options)
+            if exists?(:mvn_java_options)
+              environment["MAVEN_OPTS"] = [ fetch(:mvn_java_options, []) ].flatten.join(":")
+            end
             environment["PATH"] = [ mvn_bin_path, "$PATH" ].join(":") if mvn_setup_remotely
             environment
           }
           _cset(:mvn_default_environment_local) {
             environment = mvn_common_environment.dup
             environment["JAVA_HOME"] = fetch(:mvn_java_home_local) if exists?(:mvn_java_home_local)
-            environment["MAVEN_OPTS"] = fetch(:mvn_java_options_local) if exists?(:mvn_java_options_local)
+            if exists?(:mvn_java_options_local)
+              environment["MAVEN_OPTS"] = [ fetch(:mvn_java_options_local, []) ].flatten.join(":")
+            end
             environment["PATH"] = [ mvn_bin_path_local, "$PATH" ].join(":") if mvn_setup_locally
             environment
           }
@@ -92,6 +96,35 @@ module Capistrano
               fetch(:mvn_compile_locally, false)
             else
               false
+            end
+          }
+
+          if top.namespaces.key?(:multistage)
+            after "multistage:ensure", "mvn:setup_default_environment"
+          else
+            on :start do
+              if top.namespaces.key?(:multistage)
+                after "multistage:ensure", "mvn:setup_default_environment"
+              else
+                setup_default_environment
+              end
+            end
+          end
+
+          _cset(:mvn_environment_join_keys, %w(DYLD_LIBRARY_PATH LD_LIBRARY_PATH MANPATH PATH))
+          def _merge_environment(x, y)
+            x.merge(y) { |key, x_val, y_val|
+              if mvn_environment_join_keys.include?(key)
+                [ y_val, x_val ].join(":")
+              else
+                y_val
+              end
+            }
+          end
+
+          task(:setup_default_environment, :except => { :no_release => true }) {
+            if fetch(:mvn_setup_default_environment, true)
+              set(:default_environment, _merge_environment(default_environment, mvn_environment))
             end
           }
 
