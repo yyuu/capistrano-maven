@@ -86,7 +86,6 @@ def reset_mvn!
   variables.each_key do |key|
     reset!(key) if /^mvn_/ =~ key
   end
-# find_and_execute_task("mvn:setup_default_environment")
 end
 
 def uninstall_mvn!
@@ -104,6 +103,7 @@ task(:test_all) {
   find_and_execute_task("test_default")
   find_and_execute_task("test_with_remote")
   find_and_execute_task("test_with_local")
+  find_and_execute_task("test_with_release_build")
 }
 
 on(:start) {
@@ -129,6 +129,7 @@ namespace(:test_default) {
     set(:mvn_update_locally, true)
     set(:mvn_template_path, File.join(File.dirname(__FILE__), "templates"))
     set(:mvn_settings, %w(settings.xml))
+    set(:mvn_release_build, false)
     find_and_execute_task("mvn:setup_default_environment")
     find_and_execute_task("deploy:setup")
     find_and_execute_task("deploy")
@@ -194,6 +195,7 @@ namespace(:test_with_remote) {
     set(:mvn_update_locally, false)
     set(:mvn_template_path, File.join(File.dirname(__FILE__), "templates"))
     set(:mvn_settings, %w(settings.xml))
+    set(:mvn_release_build, false)
     find_and_execute_task("mvn:setup_default_environment")
     find_and_execute_task("deploy:setup")
     find_and_execute_task("deploy")
@@ -259,6 +261,7 @@ namespace(:test_with_local) {
     set(:mvn_update_locally, true)
     set(:mvn_template_path, File.join(File.dirname(__FILE__), "templates"))
     set(:mvn_settings, %w(settings.xml))
+    set(:mvn_release_build, false)
     find_and_execute_task("mvn:setup_default_environment")
     find_and_execute_task("deploy:setup")
     find_and_execute_task("deploy")
@@ -302,6 +305,54 @@ namespace(:test_with_local) {
 
   task(:test_mvn_artifact_locally) {
     assert_file_exists(File.join(mvn_project_path_local, "target", "capistrano-maven-0.0.1-SNAPSHOT.jar"), :via => :run_locally)
+  }
+}
+
+namespace(:test_with_release_build) {
+  task(:default) {
+    methods.grep(/^test_/).each do |m|
+      send(m)
+    end
+  }
+  before "test_with_release_build", "test_with_release_build:setup"
+  after "test_with_release_build", "test_with_release_build:teardown"
+
+  task(:setup) {
+    uninstall_mvn!
+    set(:mvn_version, "3.0.5")
+    set(:mvn_skip_tests, true)
+    set(:mvn_setup_remotely, false)
+    set(:mvn_setup_locally, true)
+    set(:mvn_update_remotely, false)
+    set(:mvn_update_locally, true)
+    set(:mvn_template_path, File.join(File.dirname(__FILE__), "templates"))
+    set(:mvn_settings, %w(settings.xml))
+    set(:mvn_release_build, true)
+    find_and_execute_task("mvn:setup_default_environment")
+    find_and_execute_task("deploy:setup")
+#   find_and_execute_task("deploy")
+  }
+
+  task(:teardown) {
+    uninstall_mvn!
+  }
+
+  task(:test_build_release) {
+    set(:mvn_extra_options_local, %w(-f release.xml))
+    reset_mvn!
+    find_and_execute_task("mvn:execute_locally")
+  }
+
+  task(:test_build_snapshot) {
+    set(:mvn_extra_options_local, %w(-f snapshot.xml))
+    reset_mvn!
+    begin
+      find_and_execute_task("mvn:execute_locally")
+    rescue SystemExit
+      aborted = true
+    ensure
+      abort("must fail with SNAPSHOT version") unless aborted
+    end
   }
 }
 
