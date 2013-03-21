@@ -1,5 +1,5 @@
 set :application, "capistrano-maven"
-set :repository,  "."
+set :repository, File.expand_path("../project", File.dirname(__FILE__))
 set :deploy_to do
   File.join("/home", user, application)
 end
@@ -116,15 +116,17 @@ namespace(:test_default) {
     set(:mvn_update_remotely, true)
     set(:mvn_update_locally, true)
 #   set(:mvn_project_path) { release_path }
-#   set(:mvn_project_path_local) { File.expand_path(".") }
+    set(:mvn_project_path_local, repository)
     set(:mvn_template_path, File.join(File.dirname(__FILE__), "templates"))
     set(:mvn_settings, %w(settings.xml))
     find_and_execute_task("deploy:setup")
+    find_and_execute_task("deploy")
   }
 
   task(:teardown) {
     reset_mvn!
     uninstall_mvn!
+    run("rm -rf #{deploy_to.dump}")
   }
 
   task(:test_run_mvn) {
@@ -137,6 +139,16 @@ namespace(:test_default) {
     assert_file_exists(mvn_bin_local, :via => :run_locally)
     assert_file_exists(File.join(mvn_settings_path_local, "settings.xml"), :via => :run_locally)
     assert_command("#{mvn_cmd_local} --version", :via => :run_locally)
+  }
+
+  task(:test_mvn_project) {
+    assert_file_exists(File.join(mvn_project_path, "pom.xml"))
+    assert_file_exists(File.join(mvn_project_path, "target", "capistrano-maven-0.0.1-SNAPSHOT.jar"))
+  }
+
+  task(:test_mvn_project_locally) {
+    assert_file_exists(File.join(mvn_project_path_local, "pom.xml"), :via => :run_locally)
+    assert_file_exists(File.join(mvn_project_path_local, "target", "capistrano-maven-0.0.1-SNAPSHOT.jar"), :via => :run_locally)
   }
 }
 

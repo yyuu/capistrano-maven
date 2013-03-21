@@ -40,8 +40,6 @@ module Capistrano
           }
           _cset(:mvn_project_path) { release_path }
           _cset(:mvn_project_path_local) { File.expand_path(".") }
-          _cset(:mvn_target_path) { File.join(mvn_project_path, "target") }
-          _cset(:mvn_target_path_local) { File.join(mvn_project_path_local, "target") }
           _cset(:mvn_template_path) { File.expand_path("config/templates") }
           _cset(:mvn_goals, %w(clean package))
           _cset(:mvn_common_options) {
@@ -123,6 +121,7 @@ module Capistrano
             false
           end
 
+          ## setup
           desc("Setup maven.")
           task(:setup, :except => { :no_release => true }) {
             transaction {
@@ -170,93 +169,122 @@ module Capistrano
             end
           }
 
+          ## update
           desc("Update maven build.")
           task(:update, :except => { :no_release => true }) {
             transaction {
-              if mvn_update_locally
-                update_locally
-              else
-                execute
-              end
+              update_remotely if mvn_update_remotely
+              update_locally if mvn_update_locally
             }
           }
-          after 'deploy:finalize_update', 'mvn:update'
+          _cset(:mvn_update_hook_type, :after)
+          _cset(:mvn_update_hook, "deploy:finalize_update")
+          on(:start) do
+            [ mvn_update_hook ].flatten.each do |hook|
+              send(mvn_update_hook_type, hook, "mvn:update") if hook
+            end
+          end
+
+          task(:update_remotely, :except => { :no_release => true }) {
+            execute_remotely
+          }
 
           desc("Update maven build locally.")
           task(:update_locally, :except => { :no_release => true }) {
-            transaction {
-              execute_locally
-              upload_locally
-            }
+            execute_locally
+            upload_locally
           }
 
-          def _mvn(cmd, path, goals=[])
-            "cd #{path.dump} && #{cmd} #{goals.map { |s| s.dump }.join(' ')}"
-          end
-
-          def _mvn_parse_version(s)
+          def _parse_project_version(s)
             # FIXME: is there any better way to get project version?
             s.split(/(?:\r?\n)+/).reject { |line| /^\[[A-Z]+\]/ =~ line }.last
           end
 
-          _cset(:mvn_release_build, false)
-          _cset(:mvn_snapshot_pattern, /-SNAPSHOT$/i)
           _cset(:mvn_project_version) {
-            _mvn_parse_version(capture(_mvn(mvn_cmd, mvn_project_path, %w(-Dexpression=project.version help:evaluate))))
+            _parse_project_version(mvn.exec(%w(-Dexpression=project.version help:evaluate), :via => :capture))
           }
           _cset(:mvn_project_version_local) {
-            _mvn_parse_version(run_locally(_mvn(mvn_cmd_local, mvn_project_path_local, %w(-Dexpression=project.version help:evaluate))))
+            _parse_project_version(mvn.exec_locally(%w(-Dexpression=project.version help:evaluate), :via => :capture_locally))
           }
-
-          def _validate_project_version(version_key)
-            if mvn_release_build
-              version = fetch(version_key)
-              if mvn_snapshot_pattern === version
-                abort("Skip to build project since \`#{version}' is a SNAPSHOT version.")
-              end
+          _cset(:mvn_snapshot_pattern, /-SNAPSHOT$/i)
+          def _validate_project_version(key)
+            if fetch(:mvn_release_build, false)
+              version = fetch(key)
+              abort("Skip to build project since \`#{version}' is a SNAPSHOT version.") if mvn_snapshot_pattern === version
             end
           end
 
           desc("Perform maven build.")
           task(:execute, :except => { :no_release => true }) {
-            on_rollback {
-              run(_mvn(mvn_cmd, mvn_project_path, %w(clean)))
-            }
+            execute_remotely
+          }
+          task(:execute_remotely, :except => { :no_release => true }) {
+            on_rollback do
+              mvn.exec("clean")
+            end
             _validate_project_version(:mvn_project_version)
-            run(_mvn(mvn_cmd, mvn_project_path, mvn_goals))
+            mvn.exec(mvn_goals)
           }
 
           desc("Perform maven build locally.")
           task(:execute_locally, :except => { :no_release => true }) {
-            on_rollback {
-              run_locally(_mvn(mvn_cmd_local, mvn_project_path_local, %w(clean)))
-            }
+            on_rollback do
+              mvn.exec_locally("clean")
+            end
             _validate_project_version(:mvn_project_version_local)
-            cmdline = _mvn(mvn_cmd_local, mvn_project_path_local, mvn_goals)
-            logger.info(cmdline)
-            abort("execution failure") unless system(cmdline)
+            mvn.exec_locally(mvn_goals)
           }
 
-          _cset(:mvn_tar, 'tar')
-          _cset(:mvn_tar_local, 'tar')
-          _cset(:mvn_target_archive) {
-            "#{mvn_target_path}.tar.gz"
-          }
-          _cset(:mvn_target_archive_local) {
-            "#{mvn_target_path_local}.tar.gz"
-          }
+          _cset(:mvn_target_path) { File.join(mvn_project_path, "target") }
+          _cset(:mvn_target_path_local) { File.join(mvn_project_path_local, "target") }
           task(:upload_locally, :except => { :no_release => true }) {
-            on_rollback {
-              run("rm -rf #{mvn_target_path} #{mvn_target_archive}")
-            }
+            on_rollback do
+              run("rm -rf #{mvn_target_path.dump}")
+            end
+            filename = "#{mvn_target_path_local}.tar.gz"
+            remote_filename = "#{mvn_target_path}.tar.gz"
             begin
-              run_locally("cd #{File.dirname(mvn_target_path_local)} && #{mvn_tar_local} chzf #{mvn_target_archive_local} #{File.basename(mvn_target_path_local)}")
-              upload(mvn_target_archive_local, mvn_target_archive)
-              run("cd #{File.dirname(mvn_target_path)} && #{mvn_tar} xzf #{mvn_target_archive} && rm -f #{mvn_target_archive}")
+              run_locally("cd #{File.dirname(mvn_target_path_local).dump} && tar chzf #{filename.dump} #{File.basename(mvn_target_path_local).dump}")
+              run("mkdir -p #{File.dirname(mvn_target_path).dump}")
+              top.upload(filename, remote_filename)
+              run("cd #{File.dirname(mvn_target_path).dump} && tar xzf #{remote_filename}")
             ensure
-              run_locally("rm -f #{mvn_target_archive_local}")
+              run("rm -f #{remote_filename.dump}") rescue nil
+              run_locally("rm -f #{filename.dump}") rescue nil
             end
           }
+
+          def _exec_command(args=[], options={})
+            args = [ args ].flatten
+            mvn = options.fetch(:mvn, "mvn")
+            execute = []
+            execute << "cd #{options[:path].dump}" if options.key?(:path)
+            execute << "#{mvn} #{args.map { |x| x.dump }.join(" ")}"
+            execute.join(" && ")
+          end
+
+          ## public methods
+          def exec(args=[], options={})
+            cmdline = _exec_command(args, { :path => mvn_project_path, :mvn => mvn_cmd, :via => :run }.merge(options))
+            _invoke_command(cmdline, options)
+          end
+
+          def exec_locally(args=[], options={})
+            via = options.delete(:via)
+            cmdline = _exec_command(args, { :path => mvn_project_path_local, :mvn => mvn_cmd_local, :via => :run_locally }.merge(options))
+            if via == :capture_locally
+              _invoke_command(cmdline, options.merge(:via => :run_locally))
+            else
+              logger.trace("executing locally: #{cmdline.dump}")
+              elapsed = Benchmark.realtime do
+                system(cmdline)
+              end
+              if $?.to_i > 0 # $? is command exit code (posix style)
+                raise Capistrano::LocalArgumentError, "Command #{cmd} returned status code #{$?}"
+              end
+              logger.trace "command finished in #{(elapsed * 1000).round}ms"
+            end
+          end
         }
       }
     end
