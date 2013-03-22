@@ -34,25 +34,25 @@ module Capistrano
           ## Maven environment
           _cset(:mvn_common_environment, {})
           _cset(:mvn_default_environment) {
-            environment = mvn_common_environment.dup
+            environment = {}
             environment["JAVA_HOME"] = fetch(:mvn_java_home) if exists?(:mvn_java_home)
             if exists?(:mvn_java_options)
               environment["MAVEN_OPTS"] = [ fetch(:mvn_java_options, []) ].flatten.join(":")
             end
             environment["PATH"] = [ mvn_bin_path, "$PATH" ].join(":") if mvn_setup_remotely
-            environment
+            _merge_environment(mvn_common_environment, environment)
           }
           _cset(:mvn_default_environment_local) {
-            environment = mvn_common_environment.dup
+            environment = {}
             environment["JAVA_HOME"] = fetch(:mvn_java_home_local) if exists?(:mvn_java_home_local)
             if exists?(:mvn_java_options_local)
               environment["MAVEN_OPTS"] = [ fetch(:mvn_java_options_local, []) ].flatten.join(":")
             end
             environment["PATH"] = [ mvn_bin_path_local, "$PATH" ].join(":") if mvn_setup_locally
-            environment
+            _merge_environment(mvn_common_environment, environment)
           }
-          _cset(:mvn_environment) { mvn_default_environment.merge(fetch(:mvn_extra_environment, {})) }
-          _cset(:mvn_environment_local) { mvn_default_environment_local.merge(fetch(:mvn_extra_environment_local, {})) }
+          _cset(:mvn_environment) { _merge_environment(mvn_default_environment, fetch(:mvn_extra_environment, {})) }
+          _cset(:mvn_environment_local) { _merge_environment(mvn_default_environment_local, fetch(:mvn_extra_environment_local, {})) }
           def _command(cmdline, options={})
             environment = options.fetch(:env, {})
             if environment.empty?
@@ -120,7 +120,7 @@ module Capistrano
           def _merge_environment(x, y)
             x.merge(y) { |key, x_val, y_val|
               if mvn_environment_join_keys.include?(key)
-                [ y_val, x_val ].join(":")
+                ( y_val.split(":") + x_val.split(":") ).uniq.join(":")
               else
                 y_val
               end
