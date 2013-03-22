@@ -26,28 +26,27 @@ This recipes will try to do following things during Capistrano `deploy:setup` an
 
 To build you Maven projects during Capistrano `deploy` tasks, add following in you `config/deploy.rb`. By default, Maven build will run after the Capistrano's `deploy:finalize_update`.
 
-    # in "config/deploy.rb"
+    # config/deploy.rb
     require "capistrano-maven"
     set(:mvn_version, "3.0.5") # Maven version to build project
 
 Following options are available to manage your Maven build.
 
- * `:mvn_version` - project Maven version
- * `:mvn_archive_url` - download URL for specified Maven version
- * `:mvn_compile_locally` - compile project on localhost. false by default.
- * `:mvn_goals` - Maven goals to execute. default is "clean package".
+ * `:mvn_version` - The project Maven version.
+ * `:mvn_archive_url` - The download URL for specified Maven version.
+ * `:mvn_setup_remotely` - Setup `mvn` on remote servers. As same value as `:mvn_update_remotely` by default.
+ * `:mvn_setup_locally` - Setup `mvn` on local server. Asa same value as `:mvn_update_locally` by default.
+ * `:mvn_update_remotely` - Run `mvn` on remote servers. `true` by default.
+ * `:mvn_update_locally` - Run `mvn` on local server. `false` by default.
+ * `:mvn_goals` - Maven goals to execute. Run `clean package` by default.
+ * `:mvn_settings` - List of your optional setting files for Maven.
+ * `:mvn_settings_local` - List of your optional setting files for Maven.
+ * `:mvn_template_path` - The local path where the templates of setting files are in. By default, searches from `config/templates`.
+ * `:mvn_java_home` - Optional `JAVA_HOME` settings for Maven commands.
+ * `:mvn_java_home_local` - Optional `JAVA_HOME` settings for Maven commands in localhost.
  * `:mvn_profiles` - Maven profiles to use.
- * `:mvn_skip_tests` - add `-Dmaven.test.skip=true` in Maven commands. false by default.
- * `:mvn_update_snapshots` - add `--update-snapshots` if Maven commands. false by default.
- * `:mvn_update_settings` - update `settings.xml` or not. false by default.
- * `:mvn_update_settings_locally` - udate `settings.xml` or not on local compilation. false by default.
- * `:mvn_settings` - list of your optional setting files for Maven. use `%w(settings.xml)` by default.
- * `:mvn_settings_local` - list of your optional setting files for Maven. use `%w(settings.xml)` by default.
- * `:mvn_settings_path` - the destination path of the optional `settings.xml` file. use `:release_path` by default.
- * `:mvn_settings_path_local` - the destination path of the optional `settings.xml` file. use `pwd` by default.
- * `:mvn_template_path` - specify ERB template path for settings.xml.
- * `:mvn_java_home` - optional `JAVA_HOME` settings for Maven commands.
- * `:mvn_java_home_local` - optional `JAVA_HOME` settings for Maven commands in localhost.
+ * `:mvn_skip_tests` - Add `-Dmaven.test.skip=true` in Maven commands. `false` by default.
+ * `:mvn_update_snapshots` - Add `-U` if Maven commands. `false` by default.
  * `:mvn_release_build` - Skip building on SNAPSHOT version. `false` by default.
 
 ## Contributing
