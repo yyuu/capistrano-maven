@@ -168,11 +168,11 @@ namespace(:test_default) {
   }
 
   task(:test_mvn_artifact) {
-    assert_file_exists(File.join(mvn_project_path, "target", "capistrano-maven-0.0.1-SNAPSHOT.jar"))
+    assert_file_exists(File.join(mvn_target_path, "capistrano-maven-0.0.1-SNAPSHOT.jar"))
   }
 
   task(:test_mvn_artifact_locally) {
-    assert_file_exists(File.join(mvn_project_path_local, "target", "capistrano-maven-0.0.1-SNAPSHOT.jar"), :via => :run_locally)
+    assert_file_exists(File.join(mvn_target_path_local, "capistrano-maven-0.0.1-SNAPSHOT.jar"), :via => :run_locally)
   }
 }
 
@@ -234,11 +234,11 @@ namespace(:test_with_remote) {
 # }
 
   task(:test_mvn_artifact) {
-    assert_file_exists(File.join(mvn_project_path, "target", "capistrano-maven-0.0.1-SNAPSHOT.jar"))
+    assert_file_exists(File.join(mvn_target_path, "capistrano-maven-0.0.1-SNAPSHOT.jar"))
   }
 
   task(:test_mvn_artifact_locally) {
-    assert_file_not_exists(File.join(mvn_project_path_local, "target", "capistrano-maven-0.0.1-SNAPSHOT.jar"), :via => :run_locally)
+    assert_file_not_exists(File.join(mvn_target_path_local, "capistrano-maven-0.0.1-SNAPSHOT.jar"), :via => :run_locally)
   }
 }
 
@@ -300,11 +300,11 @@ namespace(:test_with_local) {
   }
 
   task(:test_mvn_artifact) {
-    assert_file_exists(File.join(mvn_project_path, "target", "capistrano-maven-0.0.1-SNAPSHOT.jar"))
+    assert_file_exists(File.join(mvn_target_path, "capistrano-maven-0.0.1-SNAPSHOT.jar"))
   }
 
   task(:test_mvn_artifact_locally) {
-    assert_file_exists(File.join(mvn_project_path_local, "target", "capistrano-maven-0.0.1-SNAPSHOT.jar"), :via => :run_locally)
+    assert_file_exists(File.join(mvn_target_path_local, "capistrano-maven-0.0.1-SNAPSHOT.jar"), :via => :run_locally)
   }
 }
 
