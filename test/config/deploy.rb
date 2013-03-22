@@ -321,9 +321,9 @@ namespace(:test_with_release_build) {
     uninstall_mvn!
     set(:mvn_version, "3.0.5")
     set(:mvn_skip_tests, true)
-    set(:mvn_setup_remotely, false)
+    set(:mvn_setup_remotely, true)
     set(:mvn_setup_locally, true)
-    set(:mvn_update_remotely, false)
+    set(:mvn_update_remotely, true)
     set(:mvn_update_locally, true)
     set(:mvn_template_path, File.join(File.dirname(__FILE__), "templates"))
     set(:mvn_settings, %w(settings.xml))
@@ -338,16 +338,18 @@ namespace(:test_with_release_build) {
   }
 
   task(:test_build_release) {
+    set(:mvn_extra_options, %w(-f release.xml))
     set(:mvn_extra_options_local, %w(-f release.xml))
     reset_mvn!
-    find_and_execute_task("mvn:execute_locally")
+    find_and_execute_task("deploy")
   }
 
   task(:test_build_snapshot) {
+    set(:mvn_extra_options, %w(-f snapshot.xml))
     set(:mvn_extra_options_local, %w(-f snapshot.xml))
     reset_mvn!
     begin
-      find_and_execute_task("mvn:execute_locally")
+      find_and_execute_task("deploy")
     rescue SystemExit
       aborted = true
     ensure
