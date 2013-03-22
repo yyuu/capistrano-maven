@@ -37,7 +37,7 @@ module Capistrano
             environment = {}
             environment["JAVA_HOME"] = fetch(:mvn_java_home) if exists?(:mvn_java_home)
             if exists?(:mvn_java_options)
-              environment["MAVEN_OPTS"] = [ fetch(:mvn_java_options, []) ].flatten.join(":")
+              environment["MAVEN_OPTS"] = [ fetch(:mvn_java_options, []) ].flatten.join(" ")
             end
             environment["PATH"] = [ mvn_bin_path, "$PATH" ].join(":") if mvn_setup_remotely
             _merge_environment(mvn_common_environment, environment)
@@ -46,7 +46,7 @@ module Capistrano
             environment = {}
             environment["JAVA_HOME"] = fetch(:mvn_java_home_local) if exists?(:mvn_java_home_local)
             if exists?(:mvn_java_options_local)
-              environment["MAVEN_OPTS"] = [ fetch(:mvn_java_options_local, []) ].flatten.join(":")
+              environment["MAVEN_OPTS"] = [ fetch(:mvn_java_options_local, []) ].flatten.join(" ")
             end
             environment["PATH"] = [ mvn_bin_path_local, "$PATH" ].join(":") if mvn_setup_locally
             _merge_environment(mvn_common_environment, environment)
