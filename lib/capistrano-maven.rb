@@ -9,6 +9,7 @@ module Capistrano
     def self.extended(configuration)
       configuration.load {
         namespace(:mvn) {
+          _cset(:mvn_roles, [:app])
           _cset(:mvn_version, "3.0.5")
           _cset(:mvn_major_version) { mvn_version.split(".").first.to_i }
           _cset(:mvn_archive_url) {
@@ -33,25 +34,25 @@ module Capistrano
           ## Maven environment
           _cset(:mvn_common_environment, {})
           _cset(:mvn_default_environment) {
-            environment = mvn_common_environment.dup
+            environment = {}
             environment["JAVA_HOME"] = fetch(:mvn_java_home) if exists?(:mvn_java_home)
             if exists?(:mvn_java_options)
-              environment["MAVEN_OPTS"] = [ fetch(:mvn_java_options, []) ].flatten.join(":")
+              environment["MAVEN_OPTS"] = [ fetch(:mvn_java_options, []) ].flatten.join(" ")
             end
             environment["PATH"] = [ mvn_bin_path, "$PATH" ].join(":") if mvn_setup_remotely
-            environment
+            _merge_environment(mvn_common_environment, environment)
           }
           _cset(:mvn_default_environment_local) {
-            environment = mvn_common_environment.dup
+            environment = {}
             environment["JAVA_HOME"] = fetch(:mvn_java_home_local) if exists?(:mvn_java_home_local)
             if exists?(:mvn_java_options_local)
-              environment["MAVEN_OPTS"] = [ fetch(:mvn_java_options_local, []) ].flatten.join(":")
+              environment["MAVEN_OPTS"] = [ fetch(:mvn_java_options_local, []) ].flatten.join(" ")
             end
             environment["PATH"] = [ mvn_bin_path_local, "$PATH" ].join(":") if mvn_setup_locally
-            environment
+            _merge_environment(mvn_common_environment, environment)
           }
-          _cset(:mvn_environment) { mvn_default_environment.merge(fetch(:mvn_extra_environment, {})) }
-          _cset(:mvn_environment_local) { mvn_default_environment_local.merge(fetch(:mvn_extra_environment_local, {})) }
+          _cset(:mvn_environment) { _merge_environment(mvn_default_environment, fetch(:mvn_extra_environment, {})) }
+          _cset(:mvn_environment_local) { _merge_environment(mvn_default_environment_local, fetch(:mvn_extra_environment_local, {})) }
           def _command(cmdline, options={})
             environment = options.fetch(:env, {})
             if environment.empty?
@@ -119,14 +120,14 @@ module Capistrano
           def _merge_environment(x, y)
             x.merge(y) { |key, x_val, y_val|
               if mvn_environment_join_keys.include?(key)
-                [ y_val, x_val ].join(":")
+                ( y_val.split(":") + x_val.split(":") ).uniq.join(":")
               else
                 y_val
               end
             }
           end
 
-          task(:setup_default_environment, :except => { :no_release => true }) {
+          task(:setup_default_environment, :roles => mvn_roles, :except => { :no_release => true }) {
             if fetch(:mvn_setup_default_environment, true)
               set(:default_environment, _merge_environment(default_environment, mvn_environment))
             end
@@ -176,7 +177,7 @@ module Capistrano
 
           ## setup
           desc("Setup maven.")
-          task(:setup, :except => { :no_release => true }) {
+          task(:setup, :roles => mvn_roles, :except => { :no_release => true }) {
             transaction {
               setup_remotely if mvn_setup_remotely
               setup_locally if mvn_setup_locally
@@ -184,7 +185,7 @@ module Capistrano
           }
           after "deploy:setup", "mvn:setup"
 
-          task(:setup_remotely, :except => { :no_release => true }) {
+          task(:setup_remotely, :roles => mvn_roles, :except => { :no_release => true }) {
             _download(mvn_archive_url, mvn_archive_file_local, :via => :run_locally)
             _upload(mvn_archive_file_local, mvn_archive_file)
             unless _installed?(mvn_path)
@@ -195,7 +196,7 @@ module Capistrano
           }
 
           desc("Setup maven locally.")
-          task(:setup_locally, :except => { :no_release => true }) {
+          task(:setup_locally, :roles => mvn_roles, :except => { :no_release => true }) {
             _download(mvn_archive_url, mvn_archive_file_local, :via => :run_locally)
             unless _installed?(mvn_path_local, :via => :run_locally)
               _install(mvn_archive_file_local, mvn_path_local, :via => :run_locally)
@@ -210,21 +211,23 @@ module Capistrano
           _cset(:mvn_settings_path_local) { mvn_tools_path_local }
           _cset(:mvn_settings, [])
           _cset(:mvn_settings_local) { mvn_settings }
-          task(:update_settings, :except => { :no_release => true }) {
+          task(:update_settings, :roles => mvn_roles, :except => { :no_release => true }) {
             mvn_settings.each do |file|
               safe_put(template(file, :path => mvn_template_path), File.join(mvn_settings_path, file))
             end
           }
 
-          task(:update_settings_locally, :except => { :no_release => true }) {
+          task(:update_settings_locally, :roles => mvn_roles, :except => { :no_release => true }) {
             mvn_settings_local.each do |file|
-              File.write(File.join(mvn_settings_path_local, file), template(file, :path => mvn_template_path))
+              destination = File.join(mvn_settings_path_local, file)
+              run_locally("mkdir -p #{File.dirname(destination).dump}")
+              File.write(destination, template(file, :path => mvn_template_path))
             end
           }
 
           ## update
           desc("Update maven build.")
-          task(:update, :except => { :no_release => true }) {
+          task(:update, :roles => mvn_roles, :except => { :no_release => true }) {
             transaction {
               update_remotely if mvn_update_remotely
               update_locally if mvn_update_locally
@@ -238,12 +241,12 @@ module Capistrano
             end
           end
 
-          task(:update_remotely, :except => { :no_release => true }) {
+          task(:update_remotely, :roles => mvn_roles, :except => { :no_release => true }) {
             execute_remotely
           }
 
           desc("Update maven build locally.")
-          task(:update_locally, :except => { :no_release => true }) {
+          task(:update_locally, :roles => mvn_roles, :except => { :no_release => true }) {
             execute_locally
             upload_locally
           }
@@ -268,10 +271,10 @@ module Capistrano
           end
 
           desc("Perform maven build.")
-          task(:execute, :except => { :no_release => true }) {
+          task(:execute, :roles => mvn_roles, :except => { :no_release => true }) {
             execute_remotely
           }
-          task(:execute_remotely, :except => { :no_release => true }) {
+          task(:execute_remotely, :roles => mvn_roles, :except => { :no_release => true }) {
             on_rollback do
               mvn.exec("clean")
             end
@@ -280,7 +283,7 @@ module Capistrano
           }
 
           desc("Perform maven build locally.")
-          task(:execute_locally, :except => { :no_release => true }) {
+          task(:execute_locally, :roles => mvn_roles, :except => { :no_release => true }) {
             on_rollback do
               mvn.exec_locally("clean")
             end
@@ -290,7 +293,7 @@ module Capistrano
 
           _cset(:mvn_target_path) { File.join(mvn_project_path, "target") }
           _cset(:mvn_target_path_local) { File.join(mvn_project_path_local, "target") }
-          task(:upload_locally, :except => { :no_release => true }) {
+          task(:upload_locally, :roles => mvn_roles, :except => { :no_release => true }) {
             on_rollback do
               run("rm -rf #{mvn_target_path.dump}")
             end
@@ -300,7 +303,7 @@ module Capistrano
               run_locally("cd #{File.dirname(mvn_target_path_local).dump} && tar chzf #{filename.dump} #{File.basename(mvn_target_path_local).dump}")
               run("mkdir -p #{File.dirname(mvn_target_path).dump}")
               top.upload(filename, remote_filename)
-              run("cd #{File.dirname(mvn_target_path).dump} && tar xzf #{remote_filename}")
+              run("cd #{File.dirname(mvn_target_path).dump} && tar xzf #{remote_filename.dump}")
             ensure
               run("rm -f #{remote_filename.dump}") rescue nil
               run_locally("rm -f #{filename.dump}") rescue nil
