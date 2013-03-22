@@ -219,7 +219,9 @@ module Capistrano
 
           task(:update_settings_locally, :roles => mvn_roles, :except => { :no_release => true }) {
             mvn_settings_local.each do |file|
-              File.write(File.join(mvn_settings_path_local, file), template(file, :path => mvn_template_path))
+              destination = File.join(mvn_settings_path_local, file)
+              run_locally("mkdir -p #{File.dirname(destination).dump}")
+              File.write(destination, template(file, :path => mvn_template_path))
             end
           }
 
