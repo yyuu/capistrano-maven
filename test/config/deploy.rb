@@ -106,7 +106,7 @@ task(:test_all) {
   find_and_execute_task("test_with_release_build")
 }
 
-on(:start) {
+on(:load) {
   run("rm -rf #{deploy_to.dump}")
 }
 
