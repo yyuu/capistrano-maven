@@ -107,7 +107,7 @@ module Capistrano
           if top.namespaces.key?(:multistage)
             after "multistage:ensure", "mvn:setup_default_environment"
           else
-            on :start do
+            on :load do
               if top.namespaces.key?(:multistage)
                 after "multistage:ensure", "mvn:setup_default_environment"
               else
@@ -235,7 +235,7 @@ module Capistrano
           }
           _cset(:mvn_update_hook_type, :after)
           _cset(:mvn_update_hook, "deploy:finalize_update")
-          on(:start) do
+          on(:load) do
             [ mvn_update_hook ].flatten.each do |hook|
               send(mvn_update_hook_type, hook, "mvn:update") if hook
             end
