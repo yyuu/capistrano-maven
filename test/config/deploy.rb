@@ -99,6 +99,28 @@ def uninstall_mvn!
   reset_mvn!
 end
 
+def _test_mvn_exec_fails(args=[], options={})
+  failed = false
+  begin
+    mvn.exec(args, options)
+  rescue
+    failed = true
+  ensure
+    abort unless failed
+  end
+end
+
+def _test_mvn_exec_locally_fails(args=[], options={})
+    failed = false
+    begin
+      mvn.exec_locally(args, options)
+    rescue
+      failed = true
+    ensure
+      abort unless failed
+    end
+end
+
 task(:test_all) {
   find_and_execute_task("test_default")
   find_and_execute_task("test_with_remote")
@@ -163,8 +185,16 @@ namespace(:test_default) {
     mvn.exec("--version")
   }
 
+  task(:test_mvn_exec_fails) {
+    _test_mvn_exec_fails("--MUST-FAIL")
+  }
+
   task(:test_mvn_exec_locally) {
     mvn.exec_locally("--version")
+  }
+
+  task(:test_mvn_exec_locally_fails) {
+    _test_mvn_exec_locally_fails("--MUST-FAIL")
   }
 
   task(:test_mvn_artifact) {
@@ -229,8 +259,16 @@ namespace(:test_with_remote) {
     mvn.exec("--version")
   }
 
+  task(:test_mvn_exec_fails) {
+    _test_mvn_exec_fails("--MUST-FAIL")
+  }
+
 # task(:test_mvn_exec_locally) {
 #   mvn.exec_locally("--version")
+# }
+
+# task(:test_mvn_exec_locally_fails) {
+#   _test_mvn_exec_locally_fails("--MUST-FAIL")
 # }
 
   task(:test_mvn_artifact) {
@@ -295,8 +333,16 @@ namespace(:test_with_local) {
 #   mvn.exec("--version")
 # }
 
+# task(:test_mvn_exec_fails) {
+#   _test_mvn_exec_fails("--MUST-FAIL")
+# }
+
   task(:test_mvn_exec_locally) {
     mvn.exec_locally("--version")
+  }
+
+  task(:test_mvn_exec_locally_fails) {
+    _test_mvn_exec_locally_fails("--MUST-FAIL")
   }
 
   task(:test_mvn_artifact) {

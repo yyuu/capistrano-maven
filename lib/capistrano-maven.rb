@@ -340,7 +340,7 @@ module Capistrano
                 system(cmdline)
               end
               if $?.to_i > 0 # $? is command exit code (posix style)
-                raise Capistrano::LocalArgumentError, "Command #{cmd} returned status code #{$?}"
+                raise Capistrano::LocalArgumentError, "Command #{cmdline} returned status code #{$?}"
               end
               logger.trace "command finished in #{(elapsed * 1000).round}ms"
             end
