@@ -15,7 +15,7 @@ Gem::Specification.new do |gem|
   gem.require_paths = ["lib"]
   gem.version       = Capistrano::Maven::VERSION
 
-  gem.add_dependency("capistrano")
+  gem.add_dependency("capistrano", "< 3")
   gem.add_dependency("capistrano-file-resources", ">= 0.1.0")
   gem.add_dependency("capistrano-file-transfer-ext", ">= 0.1.0")
   gem.add_development_dependency("capistrano-jdk-installer", ">= 0.1.0")
